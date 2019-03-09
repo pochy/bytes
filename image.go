@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"strings"
 )
 
 func dumpChunk(chunk io.Reader) {
@@ -34,8 +36,7 @@ func readChunks(file *os.File) []io.Reader {
 	}
 	fmt.Printf("%d\n", int64(length))
 
-	fmt.Println("---")
-	io.Copy(os.Stdout, stream)
+	//     io.Copy(os.Stdout, stream)
 	fmt.Printf("%\n", stream)
 	fmt.Println("---")
 
@@ -43,33 +44,38 @@ func readChunks(file *os.File) []io.Reader {
 }
 
 func readChunks3(r io.ReaderAt) {
-	fmt.Println("====================")
-	b := io.NewSectionReader(r, int64(0), 1000)
-	aa := int64(1<<63 - 1)
-	fmt.Printf("-%d\n", aa)
-
-	io.Copy(os.Stdout, b)
-	fmt.Println(b)
-	fmt.Println("---")
-	readBuf := make([]byte, int64(40))
+	b := io.NewSectionReader(r, 0, 10000)
+	readBuf := make([]byte, 10000)
 	_, err := b.Read(readBuf)
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(string(readBuf)) // =&gt; re
-	fmt.Println("====================")
-	fmt.Printf("%x\n", string(readBuf)) // 16進小文字表示
-	fmt.Printf("%X\n", string(readBuf))
-	fmt.Println("====================")
-	s := string(readBuf)
-	fmt.Printf("-%v\n", s)
 
-	fmt.Println("---")
-	fmt.Printf("%b\n", s) // 2進表示
-	fmt.Printf("%d\n", s) // 10進表示
-	fmt.Printf("%x\n", s) // 16進小文字表示
-	fmt.Printf("%X\n", s)
-	fmt.Println("====================")
+	s := string(readBuf)
+	start := int64(strings.Index(fmt.Sprintf("%X", s), "FFC0") / 2)
+	fmt.Println("start position ", start)
+
+	width, height := getSize(r, start)
+	fmt.Printf("width %d: height %d\n", width, height) // 2進表示
+}
+
+func getSize(r io.ReaderAt, start int64) (uint64, uint64) {
+	b := io.NewSectionReader(r, start+5, 4)
+	readBuf := make([]byte, 2)
+	_, err := b.Read(readBuf)
+	if err != nil {
+		fmt.Println(err)
+	}
+	heightStr := fmt.Sprintf("%X", readBuf)
+	height, _ := strconv.ParseUint(heightStr, 16, 0)
+
+	_, err = b.Read(readBuf)
+	if err != nil {
+		fmt.Println(err)
+	}
+	widthStr := fmt.Sprintf("%X", readBuf)
+	width, _ := strconv.ParseUint(widthStr, 16, 0)
+	return height, width
 }
 
 func readChunks2(file *os.File) {
@@ -92,7 +98,7 @@ func readChunks2(file *os.File) {
 }
 
 func main() {
-	file, err := os.Open("test.jpg")
+	file, err := os.Open("witch2_normal.jpg")
 	if err != nil {
 		panic(err)
 	}
@@ -101,7 +107,6 @@ func main() {
 	//     readChunks2(file)
 	readChunks3(file)
 	for _, chunk := range chunks {
-		fmt.Printf("%v\n", chunk)
 		dumpChunk(chunk)
 	}
 }
